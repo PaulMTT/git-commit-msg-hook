@@ -1,0 +1,73 @@
+#!/bin/bash
+
+# Only generate commit messages for new commits (skip rebase/amend cases)
+if [ "$2" == "message" ] || [ "$2" == "template" ] || [ -n "$3" ]; then
+    exit 0
+fi
+
+# Get the list of staged files
+STAGED_FILES=$(git diff --cached --name-only)
+
+# Ensure there are changes to commit
+if [ -z "$STAGED_FILES" ]; then
+    echo "No changes to commit." >&2
+    exit 1
+fi
+
+# Initialize an empty commit message
+COMMIT_MESSAGE=""
+
+# Loop through each file and generate a commit message
+for FILE in $STAGED_FILES; do
+    # Get the diff for the current file
+    FILE_DIFF=$(git diff --cached "$FILE")
+
+    # Ensure the diff is not empty
+    if [ -z "$FILE_DIFF" ]; then
+        continue
+    fi
+
+    # Build a detailed prompt for the file
+    PROMPT="You are an AI assistant specialized in generating concise, descriptive, and meaningful Git commit messages.
+The following is the diff for a file that has been staged for a Git commit.
+Generate a commit message describing the changes in this file:
+
+File: $FILE
+
+Diff:
+$FILE_DIFF
+
+Only output the commit message, with no additional text or explanations."
+
+    # Use jq to safely construct the JSON request body
+    REQUEST_BODY=$(jq -n \
+      --arg role "user" \
+      --arg content "$PROMPT" \
+      '{
+        messages: [{role: $role, content: $content}],
+        temperature: 0.7,
+        max_tokens: 4096
+      }')
+
+    # Send the request to the mlx-lm server
+    FILE_MESSAGE=$(curl -s localhost:8080/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d "$REQUEST_BODY" | jq -r '.choices[0].message.content')
+
+    # Add the file-specific message to the overall commit message
+    if [ -n "$FILE_MESSAGE" ]; then
+        COMMIT_MESSAGE+="- $FILE_MESSAGE ($FILE)\n"
+    else
+        echo "Failed to generate commit message for $FILE." >&2
+        exit 1
+    fi
+done
+
+# Write the final commit message to the commit file
+if [ -n "$COMMIT_MESSAGE" ]; then
+    echo -e "$COMMIT_MESSAGE" > "$1"
+else
+    echo "Failed to generate commit messages." >&2
+    exit 1
+fi
+
