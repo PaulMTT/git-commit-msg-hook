@@ -1,5 +1,9 @@
 # git-commit-msg-hook
 
+Local AI powered commit messages!
+For apple silicon devices, because we are using mlx.
+Similar flow for traditional transformers model for non apple silicon devices, hook is the same.
+
 # Setup
 ## AI server
 Get the huggingface-cli via brew:
@@ -64,4 +68,4 @@ Then simply run:
 git commit
 ```
 
-And each file will be sent to the local server and built an overall commit message.
+And each file will be sent to the local server and build an overall commit message.
