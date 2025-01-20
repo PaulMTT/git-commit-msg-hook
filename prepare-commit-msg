@@ -14,10 +14,10 @@ if [ -z "$STAGED_FILES" ]; then
     exit 1
 fi
 
-# Get the diff for the current file
+# Get the diff for all changes
 FILE_DIFF=$(git diff --cached)
 
-# Build a detailed prompt for the file
+# Build a prompt
 PROMPT="Below is a git diff of the curently staged changes.
 ################################################################################
 $FILE_DIFF
@@ -44,6 +44,7 @@ COMMIT_MESSAGE=$(curl -s localhost:8080/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d "$REQUEST_BODY" | jq -r '.choices[0].message.content')
 
+# DeepSeek-R1 thinks, lets remove the tag and content of the think.
 COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | awk 'BEGIN {skip=0} /<think>/ {skip=1} /<\/think>/ {skip=0; next} !skip {print}')
 
 # Write the final commit message to the commit file
