@@ -14,54 +14,37 @@ if [ -z "$STAGED_FILES" ]; then
     exit 1
 fi
 
-# Initialize an empty commit message
-COMMIT_MESSAGE=""
+# Get the diff for the current file
+FILE_DIFF=$(git diff --cached)
 
-# Loop through each file and generate a commit message
-for FILE in $STAGED_FILES; do
-    # Get the diff for the current file
-    FILE_DIFF=$(git diff --cached "$FILE")
-
-    # Ensure the diff is not empty
-    if [ -z "$FILE_DIFF" ]; then
-        continue
-    fi
-
-    # Build a detailed prompt for the file
-    PROMPT="You are an AI assistant specialized in generating concise, descriptive, and meaningful Git commit messages.
-The following is the diff for a file that has been staged for a Git commit.
-Generate a commit message describing the changes in this file:
-
-File: $FILE
-
-Diff:
+# Build a detailed prompt for the file
+PROMPT="Below is a git diff of the curently staged changes.
+################################################################################
 $FILE_DIFF
+################################################################################
+Based on this information, write a short, clear commit message that accurately captures the changes.
+Use the imperative present tense and bulleted style.
+Do not restate the diff.
+Do not wrap your final response in any styling or blocks.
+Respond directly with the commit message.
+"
 
-Only output the commit message, with no additional text or explanations."
+# Use jq to safely construct the JSON request body
+REQUEST_BODY=$(jq -n \
+  --arg role "user" \
+  --arg content "$PROMPT" \
+  '{
+    messages: [{role: $role, content: $content}],
+    temperature: 0.7,
+    max_tokens: 4096
+  }')
 
-    # Use jq to safely construct the JSON request body
-    REQUEST_BODY=$(jq -n \
-      --arg role "user" \
-      --arg content "$PROMPT" \
-      '{
-        messages: [{role: $role, content: $content}],
-        temperature: 0.7,
-        max_tokens: 4096
-      }')
+# Send the request to the mlx-lm server
+COMMIT_MESSAGE=$(curl -s localhost:8080/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d "$REQUEST_BODY" | jq -r '.choices[0].message.content')
 
-    # Send the request to the mlx-lm server
-    FILE_MESSAGE=$(curl -s localhost:8080/v1/chat/completions \
-      -H "Content-Type: application/json" \
-      -d "$REQUEST_BODY" | jq -r '.choices[0].message.content')
-
-    # Add the file-specific message to the overall commit message
-    if [ -n "$FILE_MESSAGE" ]; then
-        COMMIT_MESSAGE+="- $FILE_MESSAGE ($FILE)\n"
-    else
-        echo "Failed to generate commit message for $FILE." >&2
-        exit 1
-    fi
-done
+COMMIT_MESSAGE=$(echo "$COMMIT_MESSAGE" | awk 'BEGIN {skip=0} /<think>/ {skip=1} /<\/think>/ {skip=0; next} !skip {print}')
 
 # Write the final commit message to the commit file
 if [ -n "$COMMIT_MESSAGE" ]; then
@@ -70,4 +53,3 @@ else
     echo "Failed to generate commit messages." >&2
     exit 1
 fi
-

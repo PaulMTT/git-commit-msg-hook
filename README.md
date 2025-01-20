@@ -18,7 +18,7 @@ huggingface-cli login
 
 Download an mlx-community model from huggingface like:
 ```
-huggingface-cli download mlx-community/phi-4-4bit
+huggingface-cli download mlx-community/DeepSeek-R1-Distill-Qwen-32B-MLX-4Bit
 ```
 
 Create a new pyenv somewhere like:
@@ -38,7 +38,7 @@ pip intall mlx_lm
 
 Serve it over an open ai compat server, using mlx:
 ```
-mlx_lm.server --model mlx-community/phi-4-4bit
+mlx_lm.server --model mlx-community/DeepSeek-R1-Distill-Qwen-32B-MLX-4Bit
 ```
 
 By default this will launch on port `8080`
